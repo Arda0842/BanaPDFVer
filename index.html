@@ -14,9 +14,6 @@
     <!-- Babel (Tarayıcıda React/JSX çalıştırabilmek için) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- PDF-Lib (PDF İşlemleri için doğrudan ve hızlı yükleme) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.5/pdf-lib.min.js"></script>
-
     <style>
         /* Özelleştirilmiş Scrollbar ve Animasyonlar */
         body { margin: 0; padding: 0; overflow-x: hidden; }
@@ -41,6 +38,7 @@
         import { createRoot } from 'https://esm.sh/react-dom/client';
         import { motion, AnimatePresence } from 'https://esm.sh/framer-motion';
         import * as THREE from 'https://esm.sh/three';
+        import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.5'; // PDF Kütüphanesini doğrudan modül olarak çekiyoruz
         import { 
           FileText, Layers, FileDown, Lock, Unlock, 
           Zap, Languages, Sun, Moon, 
@@ -444,24 +442,7 @@
           const [isDragging, setIsDragging] = useState(false);
           const [isProcessing, setIsProcessing] = useState(false);
           const [done, setDone] = useState(false);
-          // Kütüphanenin zaten yüklü olup olmadığını başlangıçta kontrol ediyoruz
-          const [pdfLibLoaded, setPdfLibLoaded] = useState(!!window.PDFLib);
           const fileInputRef = useRef(null);
-
-          useEffect(() => {
-            if (window.PDFLib) {
-              setPdfLibLoaded(true);
-              return;
-            }
-            // Beklenmedik bir gecikme olursa diye aralıklarla kontrol eden güvenlik önlemi
-            const checkInterval = setInterval(() => {
-              if (window.PDFLib) {
-                setPdfLibLoaded(true);
-                clearInterval(checkInterval);
-              }
-            }, 500);
-            return () => clearInterval(checkInterval);
-          }, []);
 
           const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
           const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
@@ -495,19 +476,15 @@
               alert("Birleştirmek için en az 2 PDF dosyası gerekli.");
               return;
             }
-            if (!window.PDFLib) {
-              alert("PDF kütüphanesi henüz yüklenmedi, lütfen biraz bekleyip tekrar deneyin.");
-              return;
-            }
 
             setIsProcessing(true);
             
             try {
-              const mergedPdf = await window.PDFLib.PDFDocument.create();
+              const mergedPdf = await PDFDocument.create();
 
               for (const file of files) {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await window.PDFLib.PDFDocument.load(arrayBuffer);
+                const pdf = await PDFDocument.load(arrayBuffer);
                 const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
                 copiedPages.forEach((page) => mergedPdf.addPage(page));
               }
@@ -610,22 +587,22 @@
                     ) : (
                       <button 
                         onClick={mergePDFs}
-                        disabled={files.length < 2 || isProcessing || !pdfLibLoaded}
+                        disabled={files.length < 2 || isProcessing}
                         className={`relative overflow-hidden group flex items-center gap-3 px-10 py-5 rounded-full text-xl font-black text-white shadow-xl transition-all
-                          ${files.length < 2 || !pdfLibLoaded ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-red-500 hover:bg-red-600 hover:shadow-red-500/40 hover:-translate-y-1'}
+                          ${files.length < 2 ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-red-500 hover:bg-red-600 hover:shadow-red-500/40 hover:-translate-y-1'}
                         `}
                       >
-                        {isProcessing || !pdfLibLoaded ? (
+                        {isProcessing ? (
                           <>
                             <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            {!pdfLibLoaded ? 'Araç Hazırlanıyor...' : 'İşleniyor...'}
+                            İşleniyor...
                           </>
                         ) : (
                           <>
                             PDF'leri Birleştir <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
                           </>
                         )}
-                        {!isProcessing && pdfLibLoaded && files.length >= 2 && (
+                        {!isProcessing && files.length >= 2 && (
                           <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[45deg] group-hover:animate-shine"></div>
                         )}
                       </button>
