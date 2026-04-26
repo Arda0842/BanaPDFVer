@@ -479,14 +479,24 @@
             }
 
             setIsProcessing(true);
+
+            // GÜVENLİK KONTROLÜ: Kütüphane yüklenmemişse kullanıcıyı uyar.
+            if (!window.PDFLib) {
+               alert("PDF işleme kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edip sayfayı yenileyin (Eğer Adblocker kullanıyorsanız geçici olarak kapatmayı deneyin).");
+               setIsProcessing(false);
+               return;
+            }
             
             try {
-              // PDF kütüphanesini HTML içerisine en baştan script olarak dahil ettiğimiz için global (window) üzerinden güvenle çağırıyoruz
               const mergedPdf = await window.PDFLib.PDFDocument.create();
 
               for (const file of files) {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await window.PDFLib.PDFDocument.load(arrayBuffer);
+                
+                // HATA ÇÖZÜMÜ: ignoreEncryption parametresi eklendi.
+                // Bu sayede belge parola korumalı olmasa bile varsayılan izinlerden kaynaklanan sahte "şifreli" hataları yoksayılır.
+                const pdf = await window.PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                
                 const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
                 copiedPages.forEach((page) => mergedPdf.addPage(page));
               }
@@ -501,10 +511,14 @@
               link.click();
               document.body.removeChild(link);
               
+              // Hafıza sızıntılarını önlemek için URL objesini temizliyoruz
+              setTimeout(() => URL.revokeObjectURL(url), 100);
+              
               setDone(true);
             } catch (error) {
               console.error("PDF birleştirme hatası:", error);
-              alert("Birleştirme sırasında bir hata oluştu. Lütfen dosyalarınızın şifreli olmadığından emin olun.");
+              // Gelişmiş hata yönetimi: Artık gizli bir hata değil, doğrudan teknik hata mesajını ekrana yansıtıyoruz.
+              alert(`Birleştirme işlemi başarısız oldu.\n\nHata Detayı: ${error.message}\n\nOlası Nedenler:\n1. Dosyalarınızdan biri (veya birkaçı) parola ile korunuyor olabilir.\n2. PDF yapısı bozuk veya tarayıcıda işlenmeye uygun olmayabilir.`);
             } finally {
               setIsProcessing(false);
             }
